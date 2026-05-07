@@ -1,5 +1,4 @@
 import "dotenv/config";
-
 import express from "express";
 
 import {
@@ -16,10 +15,12 @@ import {
 } from "discord.js";
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds
+  ]
 });
 
-const supportRoleIds = process.env.SUPPORT_ROLE_IDS
+const supportRoleIds = (process.env.SUPPORT_ROLE_IDS || "")
   .split(",")
   .map(id => id.trim())
   .filter(Boolean);
@@ -30,49 +31,34 @@ client.once("ready", () => {
 
 client.on("interactionCreate", async interaction => {
   try {
-
-    // SLASH COMMAND
-
     if (interaction.isChatInputCommand()) {
-
       if (interaction.commandName === "ticket-kur") {
-
         const embed = new EmbedBuilder()
-          .setTitle("Destek Sistemi")
-          .setDescription(
-            "Destek talebi oluşturmak için aşağıdaki butona bas."
-          )
-          .setColor("Blue");
+          .setTitle("NTE Türkiye Destek Sistemi")
+          .setDescription("Destek talebi oluşturmak için aşağıdaki butona bas.")
+          .setColor("Purple");
 
-        const createButton = new ButtonBuilder()
+        const button = new ButtonBuilder()
           .setCustomId("ticket_create")
           .setLabel("Create Ticket")
           .setEmoji("📩")
           .setStyle(ButtonStyle.Primary);
 
-        const row = new ActionRowBuilder()
-          .addComponents(createButton);
+        const row = new ActionRowBuilder().addComponents(button);
 
         return interaction.reply({
           embeds: [embed],
           components: [row]
         });
-
       }
-
     }
 
-    // BUTTON
-
     if (interaction.isButton()) {
-
       if (interaction.customId === "ticket_create") {
-
         const menu = new StringSelectMenuBuilder()
           .setCustomId("ticket_type_select")
           .setPlaceholder("Ticket türünü seç")
           .addOptions(
-
             new StringSelectMenuOptionBuilder()
               .setLabel("Destek")
               .setDescription("Genel destek almak için")
@@ -96,22 +82,18 @@ client.on("interactionCreate", async interaction => {
               .setDescription("Diğer konular")
               .setValue("diger")
               .setEmoji("❓")
-
           );
 
-        const row = new ActionRowBuilder()
-          .addComponents(menu);
+        const row = new ActionRowBuilder().addComponents(menu);
 
         return interaction.reply({
           content: "Ticket türünü seç:",
           components: [row],
           ephemeral: true
         });
-
       }
 
       if (interaction.customId === "ticket_close") {
-
         await interaction.reply({
           content: "Ticket 3 saniye içinde kapatılıyor..."
         });
@@ -121,51 +103,43 @@ client.on("interactionCreate", async interaction => {
         }, 3000);
 
         return;
-
       }
-
     }
 
-    // SELECT MENU
-
     if (interaction.isStringSelectMenu()) {
-
       if (interaction.customId === "ticket_type_select") {
+        await interaction.deferReply({ ephemeral: true });
 
         const ticketType = interaction.values[0];
+
+        const typeNames = {
+          destek: "Destek",
+          sikayet: "Şikayet",
+          yetkili: "Yetkili Başvuru",
+          diger: "Diğer"
+        };
 
         const safeUsername = interaction.user.username
           .toLowerCase()
           .replace(/[^a-z0-9]/g, "");
 
-        const channelName =
-          `ticket-${ticketType}-${safeUsername}`;
+        const channelName = `ticket-${ticketType}-${safeUsername}`;
 
-        const existingChannel =
-          interaction.guild.channels.cache.find(
-            channel =>
-              channel.name === channelName
-          );
+        const existingChannel = interaction.guild.channels.cache.find(
+          channel => channel.name === channelName
+        );
 
         if (existingChannel) {
-
-          return interaction.reply({
-            content:
-              `Zaten açık bir ticketın var: ${existingChannel}`,
-            ephemeral: true
-          });
-
+          return interaction.editReply(
+            `Zaten açık bir ticketın var: ${existingChannel}`
+          );
         }
 
         const permissionOverwrites = [
-
           {
             id: interaction.guild.id,
-            deny: [
-              PermissionFlagsBits.ViewChannel
-            ]
+            deny: [PermissionFlagsBits.ViewChannel]
           },
-
           {
             id: interaction.user.id,
             allow: [
@@ -174,16 +148,15 @@ client.on("interactionCreate", async interaction => {
               PermissionFlagsBits.ReadMessageHistory
             ]
           },
-
           {
             id: interaction.client.user.id,
             allow: [
               PermissionFlagsBits.ViewChannel,
               PermissionFlagsBits.SendMessages,
-              PermissionFlagsBits.ManageChannels
+              PermissionFlagsBits.ManageChannels,
+              PermissionFlagsBits.ReadMessageHistory
             ]
           },
-
           ...supportRoleIds.map(roleId => ({
             id: roleId,
             allow: [
@@ -192,19 +165,13 @@ client.on("interactionCreate", async interaction => {
               PermissionFlagsBits.ReadMessageHistory
             ]
           }))
-
         ];
 
-        const channel =
-          await interaction.guild.channels.create({
-
-            name: channelName,
-
-            type: ChannelType.GuildText,
-
-            permissionOverwrites
-
-          });
+        const channel = await interaction.guild.channels.create({
+          name: channelName,
+          type: ChannelType.GuildText,
+          permissionOverwrites
+        });
 
         const closeButton = new ButtonBuilder()
           .setCustomId("ticket_close")
@@ -212,60 +179,41 @@ client.on("interactionCreate", async interaction => {
           .setEmoji("🔒")
           .setStyle(ButtonStyle.Danger);
 
-        const row = new ActionRowBuilder()
-          .addComponents(closeButton);
+        const row = new ActionRowBuilder().addComponents(closeButton);
 
         const embed = new EmbedBuilder()
-          .setTitle("Ticket Açıldı")
+          .setTitle(`${typeNames[ticketType]} Ticket`)
           .setDescription(
-            `${interaction.user}, destek talebin oluşturuldu.`
+            `${interaction.user}, ticket oluşturuldu.\nYetkililer kısa sürede seninle ilgilenecek.`
           )
           .setColor("Green");
 
+        const roleMentions = supportRoleIds.map(id => `<@&${id}>`).join(" ");
+
         await channel.send({
-
-          content:
-            `${interaction.user} ${supportRoleIds.map(id => `<@&${id}>`).join(" ")}`,
-
+          content: `${interaction.user} ${roleMentions}`,
           embeds: [embed],
-
           components: [row]
-
         });
 
-        return interaction.reply({
-          content: `Ticket açıldı: ${channel}`,
-          ephemeral: true
-        });
-
+        return interaction.editReply(`Ticket açıldı: ${channel}`);
       }
-
     }
-
   } catch (error) {
+    console.error("Ticket hatası:", error);
 
-    console.error(error);
-
-    if (interaction.deferred || interaction.replied) {
-
-      return interaction.editReply(
-        "Bir hata oluştu."
-      );
-
+    if (interaction.replied || interaction.deferred) {
+      return interaction.editReply("Bir hata oluştu.");
     }
 
     return interaction.reply({
       content: "Bir hata oluştu.",
       ephemeral: true
     });
-
   }
-
 });
 
 client.login(process.env.TOKEN);
-
-// EXPRESS SERVER
 
 const app = express();
 
