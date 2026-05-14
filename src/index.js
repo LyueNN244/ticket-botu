@@ -26,6 +26,14 @@ const supportRoleIds = (process.env.SUPPORT_ROLE_IDS || "")
   .filter(Boolean);
 
 client.once("ready", () => {
+  client.user.setPresence({
+    activities: [{
+      name: "🎫 Managing NTE tickets",
+      type: 0
+    }],
+    status: "online"
+  });
+
   console.log(`${client.user.tag} aktif!`);
 });
 
