@@ -28,7 +28,7 @@ const supportRoleIds = (process.env.SUPPORT_ROLE_IDS || "")
 client.once("ready", () => {
   client.user.setPresence({
     activities: [{
-      name: "🎫 Managing NTE tickets",
+      name: "🎫 Managing support tickets",
       type: 0
     }],
     status: "online"
