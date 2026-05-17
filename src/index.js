@@ -3,9 +3,13 @@ import express from "express";
 import mongoose from "mongoose";
 import GuildConfig from "./models/GuildConfig.js";
 
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log("MongoDB bağlantısı başarılı!"))
-  .catch(err => console.error("MongoDB bağlantı hatası:", err));
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log("MongoDB bağlantısı başarılı!"))
+    .catch(err => console.error("MongoDB bağlantı hatası:", err));
+} else {
+  console.warn("UYARI: MONGODB_URI .env dosyasında veya Render ortam değişkenlerinde bulunamadı! Veritabanı işlemleri çalışmayacaktır.");
+}
 
 import {
   Client,
