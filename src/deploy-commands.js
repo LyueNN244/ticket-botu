@@ -1,21 +1,33 @@
 import "dotenv/config";
+import { REST, Routes, SlashCommandBuilder } from "discord.js";
 
-import { REST, Routes } from "discord.js";
+const commands = [
+  new SlashCommandBuilder()
+    .setName("ticket-kur")
+    .setDescription("Ticket sistemini kurar"),
 
-import { commands } from "./commands.js";
+  new SlashCommandBuilder()
+    .setName("destek-rol-ayarla")
+    .setDescription("Destek rolünü ayarlar")
+    .addRoleOption(option =>
+      option
+        .setName("rol")
+        .setDescription("Destek rolü")
+        .setRequired(true)
+    )
+].map(command => command.toJSON());
 
-const rest = new REST({ version: "10" })
-  .setToken(process.env.TOKEN);
+const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
 try {
-  console.log("Ticket komutları yükleniyor...");
+  console.log("Global slash komutları yükleniyor...");
 
   await rest.put(
     Routes.applicationCommands(process.env.CLIENT_ID),
     { body: commands }
   );
 
-  console.log("Ticket komutları yüklendi.");
+  console.log("Global slash komutları başarıyla yüklendi!");
 } catch (error) {
   console.error(error);
 }
