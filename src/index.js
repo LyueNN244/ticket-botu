@@ -1,5 +1,11 @@
 import "dotenv/config";
 import express from "express";
+import mongoose from "mongoose";
+import GuildConfig from "./models/GuildConfig.js";
+
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log("MongoDB bağlantısı başarılı!"))
+  .catch(err => console.error("MongoDB bağlantı hatası:", err));
 
 import {
   Client,
@@ -40,6 +46,21 @@ client.once("ready", () => {
 client.on("interactionCreate", async interaction => {
   try {
     if (interaction.isChatInputCommand()) {
+      if (interaction.commandName === "destek-rol-ayarla") {
+        const role = interaction.options.getRole("rol");
+        
+        await GuildConfig.findOneAndUpdate(
+          { guildId: interaction.guild.id },
+          { supportRoleId: role.id },
+          { upsert: true, new: true }
+        );
+
+        return interaction.reply({
+          content: `Destek rolü başarıyla ${role} olarak ayarlandı!`,
+          ephemeral: true
+        });
+      }
+
       if (interaction.commandName === "ticket-kur") {
         const embed = new EmbedBuilder()
           .setTitle("NTE Türkiye Destek Sistemi")
@@ -143,6 +164,9 @@ client.on("interactionCreate", async interaction => {
           );
         }
 
+        let guildConfig = await GuildConfig.findOne({ guildId: interaction.guild.id });
+        let serverSupportRoleId = guildConfig ? guildConfig.supportRoleId : null;
+
         const permissionOverwrites = [
           {
             id: interaction.guild.id,
@@ -164,16 +188,34 @@ client.on("interactionCreate", async interaction => {
               PermissionFlagsBits.ManageChannels,
               PermissionFlagsBits.ReadMessageHistory
             ]
-          },
-          ...supportRoleIds.map(roleId => ({
-            id: roleId,
+          }
+        ];
+
+        // Add server-specific support role from DB
+        if (serverSupportRoleId) {
+          permissionOverwrites.push({
+            id: serverSupportRoleId,
             allow: [
               PermissionFlagsBits.ViewChannel,
               PermissionFlagsBits.SendMessages,
               PermissionFlagsBits.ReadMessageHistory
             ]
-          }))
-        ];
+          });
+        }
+
+        // Add fallback support roles from .env
+        for (const roleId of supportRoleIds) {
+          if (!permissionOverwrites.find(p => p.id === roleId)) {
+            permissionOverwrites.push({
+              id: roleId,
+              allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory
+              ]
+            });
+          }
+        }
 
         const channel = await interaction.guild.channels.create({
           name: channelName,
@@ -196,10 +238,13 @@ client.on("interactionCreate", async interaction => {
           )
           .setColor("Green");
 
-        const roleMentions = supportRoleIds.map(id => `<@&${id}>`).join(" ");
+        const roleMentions = [];
+        if (serverSupportRoleId) roleMentions.push(`<@&${serverSupportRoleId}>`);
+        supportRoleIds.forEach(id => roleMentions.push(`<@&${id}>`));
+        const uniqueMentions = [...new Set(roleMentions)].join(" ");
 
         await channel.send({
-          content: `${interaction.user} ${roleMentions}`,
+          content: `${interaction.user} ${uniqueMentions}`,
           embeds: [embed],
           components: [row]
         });
